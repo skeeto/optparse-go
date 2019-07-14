@@ -2,7 +2,7 @@
 
 // Package optparse parses command line arguments very similarly to GNU
 // getopt_long(). It supports long options and optional arguments, but
-// arguments are not permuted. It is intended as a replacement for Go's
+// does not permute arguments. It is intended as a replacement for Go's
 // flag package.
 //
 // To use, define your options as an Option slice and pass it, along
@@ -143,6 +143,9 @@ func (p *Parser) long(options []Option, args []string) (*Result, error) {
 // arguments are left, returns Done as the error, like io.EOF. The first
 // argument, args[0], is skipped. Arguments are not permuted and parsing
 // stops at the first non-option argument, or "--".
+//
+// If there is an error, the associated argument is not consumed and
+// would be returned by the Args() method.
 func (p *Parser) Next(options []Option, args []string) (*Result, error) {
 	if p.optind == 0 {
 		p.optind = 1 // initialize

@@ -2,7 +2,7 @@
 
 Package optparse parses command line arguments very similarly to GNU
 `getopt_long()`. It supports long options and optional arguments, but
-arguments are not permuted. It is intended as a replacement for Go's
+does not permute arguments. It is intended as a replacement for Go's
 flag package.
 
 Like the traditional `getopt()`, it doesn't automatically parse option
@@ -73,5 +73,6 @@ func main() {
 	fmt.Println("color", color)
 	fmt.Println("delay", delay)
 	fmt.Println("erase", erase)
+	fmt.Println(parser.Args(os.Args))
 }
 ```

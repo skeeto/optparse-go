@@ -11,7 +11,11 @@ var options = []Option{
 	{"color", 'c', KindOptional},
 	{"delay", 'd', KindRequired},
 	{"erase", 'e', KindNone},
-	{"pi", 'π', KindNone},
+
+	// special cases
+	{"pi", 'π', KindNone}, // multibyte short option
+	{"long", 0, KindNone}, // long only
+	{"", 's', KindNone},   // short only
 }
 
 type config struct {
@@ -142,6 +146,18 @@ func TestParse(t *testing.T) {
 			[]string{"", "-x"},
 			config{false, false, "", 0, 0, 0},
 			[]string{"-x"},
+			true,
+		},
+		{
+			[]string{"", "-"},
+			config{false, false, "", 0, 0, 0},
+			[]string{"-"},
+			false,
+		},
+		{
+			[]string{"", "-\x00"},
+			config{false, false, "", 0, 0, 0},
+			[]string{"-\x00"},
 			true,
 		},
 	}
