@@ -67,19 +67,19 @@ func TestParse(t *testing.T) {
 		args []string
 		conf config
 		rest []string
-		err  bool
+		err  error
 	}{
 		{
 			[]string{"", "--", "foobar"},
 			config{false, false, "", 0, 0, 0},
 			[]string{"foobar"},
-			false,
+			nil,
 		},
 		{
 			[]string{"", "-a", "-b", "-c", "-d", "10", "-e"},
 			config{true, true, "", 10, 1, 0},
 			[]string{},
-			false,
+			nil,
 		},
 		{
 			[]string{
@@ -92,67 +92,67 @@ func TestParse(t *testing.T) {
 			},
 			config{true, true, "", 10, 1, 0},
 			[]string{},
-			false,
+			nil,
 		},
 		{
 			[]string{"", "-a", "-b", "-cred", "-d", "10", "-e"},
 			config{true, true, "red", 10, 1, 0},
 			[]string{},
-			false,
+			nil,
 		},
 		{
 			[]string{"", "-abcblue", "-d10", "foobar"},
 			config{true, true, "blue", 10, 0, 0},
 			[]string{"foobar"},
-			false,
+			nil,
 		},
 		{
 			[]string{"", "--color=red", "-d", "10", "--", "foobar"},
 			config{false, false, "red", 10, 0, 0},
 			[]string{"foobar"},
-			false,
+			nil,
 		},
 		{
 			[]string{"", "-eeeeee"},
 			config{false, false, "", 0, 6, 0},
 			[]string{},
-			false,
+			nil,
 		},
 		{
 			[]string{"", "-πeabπee"},
 			config{true, true, "", 0, 3, 2},
 			[]string{},
-			false,
+			nil,
 		},
 		{
 			[]string{"", "--delay"},
 			config{false, false, "", 0, 0, 0},
 			[]string{},
-			true,
+			Error{Option{"delay", 'd', KindRequired}, ErrMissing},
 		},
 		{
 			[]string{"", "--foo", "bar"},
 			config{false, false, "", 0, 0, 0},
 			[]string{"--foo", "bar"},
-			true,
+			Error{Option{"foo", 0, 0}, ErrInvalid},
 		},
 		{
 			[]string{"", "-x"},
 			config{false, false, "", 0, 0, 0},
 			[]string{"-x"},
-			true,
+			Error{Option{"", 'x', 0}, ErrInvalid},
 		},
 		{
 			[]string{"", "-"},
 			config{false, false, "", 0, 0, 0},
 			[]string{"-"},
-			false,
+			nil,
 		},
 		{
 			[]string{"", "-\x00"},
 			config{false, false, "", 0, 0, 0},
 			[]string{"-\x00"},
-			true,
+			Error{Option{"", 0, 0}, ErrInvalid},
 		},
 	}
 
@@ -164,13 +164,13 @@ func TestParse(t *testing.T) {
 		if !equal(rest, row.rest) {
 			t.Errorf("parse(%q), got %v, want %v", row.args[1:], rest, row.rest)
 		}
-		if row.err {
+		if row.err != nil {
+			want := row.err.(Error)
 			if err == nil {
-				t.Errorf("parse(%q), got nil, wanted error", row.args[1:])
-			}
-		} else {
-			if err != nil {
-				t.Errorf("parse(%q), got %v, wanted nil", row.args[1:], err)
+				t.Errorf("parse(%q), got nil, wanted %#v", row.args[1:], want)
+			} else if got := err.(Error); got != want {
+				t.Errorf("parse(%q), got %#v, wanted %#v",
+					row.args[1:], got, want)
 			}
 		}
 	}
