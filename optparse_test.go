@@ -28,15 +28,9 @@ type config struct {
 }
 
 func parse(args []string) (conf config, rest []string, err error) {
-	var parser Parser
-	for {
-		result, err := parser.Next(options, args)
-		if err != nil {
-			if err != Done {
-				return conf, parser.Args(args), err
-			}
-			break
-		}
+	var results []Result
+	results, rest, err = Parse(options, args)
+	for _, result := range results {
 		switch result.Long {
 		case "amend":
 			conf.amend = true
@@ -53,7 +47,7 @@ func parse(args []string) (conf config, rest []string, err error) {
 			conf.pi++
 		}
 	}
-	return conf, parser.Args(args), nil
+	return
 }
 
 func equal(a, b []string) bool {
@@ -172,7 +166,7 @@ func TestParse(t *testing.T) {
 		}
 		if row.err {
 			if err == nil {
-				t.Errorf("parse(%q), got nil, wanted nil", row.args[1:])
+				t.Errorf("parse(%q), got nil, wanted error", row.args[1:])
 			}
 		} else {
 			if err != nil {

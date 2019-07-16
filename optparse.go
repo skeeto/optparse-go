@@ -6,29 +6,34 @@
 // flag package.
 //
 // To use, define your options as an Option slice and pass it, along
-// with the argument slice, to the Next() method of a zero-initialized
-// Parser. Each call to Next() will return the next argument, or the
-// error if something went wrong.
+// with the arguments string slice, to the Parse() function. It will
+// return a slice of parsing results, which is to be iterated over just
+// like getopt().
 package optparse // import "github.com/skeeto/optparse-go"
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 )
 
 const (
 	// KindNone means the option takes no argument
-	KindNone = iota
+	KindNone Kind = iota
 	// KindRequired means the argument requires an option
 	KindRequired
 	// KindOptional means the argument is optional
 	KindOptional
+
+	// ErrInvalid is used when an option is not recognized.
+	ErrInvalid = "invalid option"
+	// ErrMissing is used when a required argument is missing.
+	ErrMissing = "option requires an argument"
+	// ErrTooMany is used when an unwanted argument is provided.
+	ErrTooMany = "option takes no arguments"
 )
 
-// Done is the error returned when parsing is complete. It is analogous
-// to io.EOF.
-var Done = errors.New("end of arguments")
+// Kind is an enumeration indicating how an option is used.
+type Kind int
 
 // Option represents a single argument. Unicode is fully supported, so a
 // short option may be any character. Using the zero value for Long
@@ -37,14 +42,25 @@ var Done = errors.New("end of arguments")
 type Option struct {
 	Long  string
 	Short rune
-	Kind  int
+	Kind  Kind
 }
 
-// Parser represents the option parsing state between calls to Parse().
-// The zero value for Parser is ready to use.
-type Parser struct {
-	optind int
-	subopt int
+// Error represents all possible parsing errors. It embeds the option
+// that has been misused, and Message is one of the three error strings.
+// Implements error.
+type Error struct {
+	Option
+	Message string
+}
+
+func (e Error) Error() string {
+	if e.Long != "" && e.Short != 0 {
+		return fmt.Sprintf("%s: --%s (-%c)", e.Message, e.Long, e.Short)
+	} else if e.Long != "" {
+		return fmt.Sprintf("%s: --%s", e.Message, e.Long)
+	} else {
+		return fmt.Sprintf("%s: -%c", e.Message, e.Short)
+	}
 }
 
 // Result is an individual successfully-parsed option. It embeds the
@@ -56,12 +72,40 @@ type Result struct {
 	Optarg string
 }
 
-func (p *Parser) short(options []Option, args []string) (*Result, error) {
-	runes := []rune(args[p.optind])
+// Parse results a slice of the parsed results, the remaining arguments,
+// and the first parser error. The results slice always contains results
+// up until the first error.
+//
+// The first argument, args[0], is skipped, and arguments are not
+// permuted. Parsing stops at the first non-option argument, or "--".
+// The latter is not included in the remaining, unparsed arguments.
+func Parse(options []Option, args []string) ([]Result, []string, error) {
+	parser := parser{options: options, args: args}
+	var results []Result
+	for {
+		result, err := parser.next()
+		if err != nil || result == nil {
+			return results, parser.rest(), err
+		}
+		results = append(results, *result)
+	}
+}
+
+// Parser represents the option parsing state between calls to next().
+// The zero value for Parser is ready to use.
+type parser struct {
+	options []Option
+	args    []string
+	optind  int
+	subopt  int
+}
+
+func (p *parser) short() (*Result, error) {
+	runes := []rune(p.args[p.optind])
 	c := runes[p.subopt]
-	option := findShort(options, c)
+	option := findShort(p.options, c)
 	if option == nil {
-		return nil, fmt.Errorf("invalid option, %q", c)
+		return nil, Error{Option{"", c, 0}, ErrInvalid}
 	}
 	switch option.Kind {
 
@@ -78,10 +122,10 @@ func (p *Parser) short(options []Option, args []string) (*Result, error) {
 		p.subopt = 0
 		p.optind++
 		if optarg == "" {
-			if p.optind == len(args) {
-				return nil, fmt.Errorf("option requires an argument, %q", c)
+			if p.optind == len(p.args) {
+				return nil, Error{*option, ErrMissing}
 			}
-			optarg = args[p.optind]
+			optarg = p.args[p.optind]
 			p.optind++
 		}
 		return &Result{*option, optarg}, nil
@@ -96,8 +140,8 @@ func (p *Parser) short(options []Option, args []string) (*Result, error) {
 	panic("invalid Kind")
 }
 
-func (p *Parser) long(options []Option, args []string) (*Result, error) {
-	long := args[p.optind][2:]
+func (p *parser) long() (*Result, error) {
+	long := p.args[p.optind][2:]
 
 	eq := strings.IndexByte(long, '=')
 	var optarg string
@@ -108,9 +152,9 @@ func (p *Parser) long(options []Option, args []string) (*Result, error) {
 		attached = true
 	}
 
-	option := findLong(options, long)
+	option := findLong(p.options, long)
 	if option == nil {
-		return nil, fmt.Errorf("invalid option, %q", long)
+		return nil, Error{Option{long, 0, 0}, ErrInvalid}
 	}
 	p.optind++
 
@@ -118,16 +162,16 @@ func (p *Parser) long(options []Option, args []string) (*Result, error) {
 
 	case KindNone:
 		if attached {
-			return nil, fmt.Errorf("option takes no arguments, %q", long)
+			return nil, Error{*option, ErrTooMany}
 		}
 		return &Result{*option, ""}, nil
 
 	case KindRequired:
-		if p.optind == len(args) {
-			return nil, fmt.Errorf("option requires an argument, %q", long)
+		if p.optind == len(p.args) {
+			return nil, Error{*option, ErrMissing}
 		}
 		if !attached {
-			optarg = args[p.optind]
+			optarg = p.args[p.optind]
 			p.optind++
 		}
 		return &Result{*option, optarg}, nil
@@ -139,48 +183,45 @@ func (p *Parser) long(options []Option, args []string) (*Result, error) {
 	panic("invalid Kind")
 }
 
-// Next returns the next option in the argument slice. When no more
-// arguments are left, returns Done as the error, like io.EOF. The first
-// argument, args[0], is skipped. Arguments are not permuted and parsing
-// stops at the first non-option argument, or "--".
+// Next returns the next option in the argument slice. When no arguments
+// remain, returns nil as the result.
 //
-// If there is an error, the associated argument is not consumed and
-// would be returned by the Args() method.
-func (p *Parser) Next(options []Option, args []string) (*Result, error) {
+// If there is an error, the associated argument is not consumed.
+func (p *parser) next() (*Result, error) {
 	if p.optind == 0 {
 		p.optind = 1 // initialize
 	}
 
-	if p.optind == len(args) {
-		return nil, Done
+	if p.optind == len(p.args) {
+		return nil, nil
 	}
-	arg := args[p.optind]
+	arg := p.args[p.optind]
 
 	if p.subopt > 0 {
 		// continue parsing short options
-		return p.short(options, args)
+		return p.short()
 	}
 
 	if len(arg) < 2 || arg[0] != '-' {
-		return nil, Done
+		return nil, nil
 	}
 
 	if arg == "--" {
 		p.optind++
-		return nil, Done
+		return nil, nil
 	}
 
 	if arg[:2] == "--" {
-		return p.long(options, args)
+		return p.long()
 	}
 	p.subopt = 1
-	return p.short(options, args)
+	return p.short()
 }
 
 // Args slices the argument slice to return the arguments that were not
 // parsed, excluding the "--".
-func (p *Parser) Args(args []string) []string {
-	return args[p.optind:]
+func (p *parser) rest() []string {
+	return p.args[p.optind:]
 }
 
 func findLong(options []Option, long string) *Option {

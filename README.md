@@ -13,7 +13,7 @@ Online documentation: <https://godoc.org/github.com/skeeto/optparse-go>
 
 ## Example usage
 
-``` go
+```go
 package main
 
 import (
@@ -25,7 +25,7 @@ import (
 )
 
 func fatal(err error) {
-	fmt.Fprintln(os.Stderr, "%s: %s\n", os.Args[0], err)
+	fmt.Fprintf(os.Stderr, "%s: %s\n", os.Args[0], err)
 	os.Exit(1)
 }
 
@@ -44,15 +44,12 @@ func main() {
 	var delay int
 	var erase int
 
-	var parser optparse.Parser
-	for {
-		result, err := parser.Next(options, os.Args)
-		if err != nil {
-			if err != optparse.Done {
-				fatal(err)
-			}
-			break
-		}
+	results, rest, err := optparse.Parse(options, os.Args)
+	if err != nil {
+		fatal(err)
+	}
+
+	for _, result := range results {
 		switch result.Long {
 		case "amend":
 			amend = true
@@ -75,6 +72,6 @@ func main() {
 	fmt.Println("color", color)
 	fmt.Println("delay", delay)
 	fmt.Println("erase", erase)
-	fmt.Println(parser.Args(os.Args))
+	fmt.Println(rest)
 }
 ```
