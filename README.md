@@ -9,7 +9,7 @@ Like the traditional `getopt()`, it doesn't automatically parse option
 arguments, instead delivering them as strings. Nor does it automatically
 generate a usage message.
 
-Online documentation: <https://godoc.org/github.com/skeeto/optparse-go>
+Online documentation: <https://godoc.org/nullprogram.com/x/optparse>
 
 ## Example usage
 
@@ -21,7 +21,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/skeeto/optparse-go"
+	"nullprogram.com/x/optparse"
 )
 
 func fatal(err error) {
