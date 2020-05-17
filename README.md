@@ -9,7 +9,7 @@ Like the traditional `getopt()`, it doesn't automatically parse option
 arguments, instead delivering them as strings. Nor does it automatically
 generate a usage message.
 
-Online documentation: <https://godoc.org/nullprogram.com/x/optparse>
+Online documentation: <https://pkg.go.dev/nullprogram.com/x/optparse>
 
 ## Example usage
 
