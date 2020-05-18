@@ -5,6 +5,8 @@ Package optparse parses command line arguments very similarly to GNU
 does not permute arguments. It is intended as a replacement for Go's
 flag package.
 
+    go get nullprogram.com/x/optparse
+
 Like the traditional `getopt()`, it doesn't automatically parse option
 arguments, instead delivering them as strings. Nor does it automatically
 generate a usage message.
